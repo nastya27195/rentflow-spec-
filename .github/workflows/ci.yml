@@ -1,0 +1,83 @@
+name: spec-ci
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  schema:
+    name: db/schema.sql on PostgreSQL 15
+    runs-on: ubuntu-latest
+    services:
+      pg:
+        image: postgres:15
+        env: { POSTGRES_PASSWORD: x }
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply schema
+        run: psql postgresql://postgres:x@localhost:5432/postgres -v ON_ERROR_STOP=1 -f db/schema.sql
+      - name: Enum consistency (schema.sql vs openapi.yaml)
+        run: |
+          pip install pyyaml >/dev/null
+          python - <<'EOF'
+          import re, yaml, sys
+          sql = open('db/schema.sql').read()
+          oa = yaml.safe_load(open('api/openapi.yaml'))
+          schemas = oa['components']['schemas']
+          bad = 0
+          for name, col in [('PaymentStatus','payment'),('InvoiceStatus','invoice'),('ContractStatus','contract'),('TaskStatus','task')]:
+              api = set(schemas[name]['enum'])
+              m = re.search(r'CREATE TABLE\s+' + col + r'\b.*?status\s+text[^\n]*?IN\s*\(([^)]*)\)', sql, re.S | re.I)
+              if not m:
+                  print('WARN: no CHECK found for', col); continue
+              db = set(re.findall(r"'([A-Z_]+)'", m.group(1)))
+              if api != db:
+                  bad += 1; print('MISMATCH', name, 'api-db', api-db, 'db-api', db-api)
+          sys.exit(1 if bad else 0)
+          EOF
+
+  contracts:
+    name: OpenAPI + JSON Schema
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - name: Validate openapi.yaml
+        run: npx --yes @redocly/cli@latest lint api/openapi.yaml --skip-rule operation-4xx-response --skip-rule no-unused-components
+      - name: Validate events/*.v2.json
+        run: |
+          pip install jsonschema >/dev/null
+          python - <<'EOF'
+          import glob, json
+          from jsonschema import Draft202012Validator as V
+          for f in sorted(glob.glob('events/*.v2.json')):
+              V.check_schema(json.load(open(f))); print('ok', f)
+          EOF
+
+  diagrams:
+    name: PlantUML syntax + PNG freshness
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '17' }
+      - name: Check PlantUML syntax
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq graphviz >/dev/null
+          curl -sSL -o plantuml.jar https://github.com/plantuml/plantuml/releases/latest/download/plantuml.jar
+          for f in diagrams/*.puml; do
+            [ "$(basename "$f")" = "_style.puml" ] && continue   # фрагмент для !include, не самостоятельная диаграмма
+            java -jar plantuml.jar -checkonly "$f"
+          done
+      - name: Every .puml/.bpmn has a rendered PNG
+        run: |
+          rc=0
+          for f in diagrams/*.puml diagrams/*.bpmn; do
+            n=$(basename "${f%.*}"); [ "$n" = "_style" ] && continue
+            [ -s "img/$n.png" ] || { echo "missing img/$n.png"; rc=1; }
+          done
+          exit $rc
