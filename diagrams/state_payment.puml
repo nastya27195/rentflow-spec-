@@ -1,0 +1,14 @@
+@startuml state_payment
+' Синхронизировано с CHECK payment.status
+[*] --> PENDING : POST /payments (Idempotency-Key)
+PENDING --> CONFIRMED : webhook succeeded (подпись OK)
+PENDING --> FAILED : webhook failed (failure_reason)
+PENDING --> CANCELLED : отмена пользователем
+PENDING --> EXPIRED : TTL провайдера истёк (30 мин)
+CONFIRMED --> REFUNDED : возврат (refund_provider_ref)
+CONFIRMED --> [*]
+FAILED --> [*]
+CANCELLED --> [*]
+EXPIRED --> [*]
+REFUNDED --> [*]
+@enduml

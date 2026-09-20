@@ -1,0 +1,29 @@
+' RentFlow — единый стиль всех PlantUML-диаграмм. Подключение: !include _style.puml
+skinparam defaultFontName "DejaVu Sans"
+skinparam shadowing false
+skinparam roundCorner 10
+skinparam ArrowColor #2F5D8A
+skinparam state {
+  BackgroundColor #EEF4FB
+  BorderColor #2F5D8A
+  FontColor #1B2A3A
+}
+skinparam sequence {
+  ParticipantBackgroundColor #EEF4FB
+  ParticipantBorderColor #2F5D8A
+  LifeLineBorderColor #2F5D8A
+  ActorBackgroundColor #EEF4FB
+  ActorBorderColor #2F5D8A
+}
+skinparam database {
+  BackgroundColor #F6F6F6
+  BorderColor #777777
+}
+skinparam queue {
+  BackgroundColor #FFF4DD
+  BorderColor #B8860B
+}
+skinparam note {
+  BackgroundColor #FFFBE6
+  BorderColor #C9B458
+}

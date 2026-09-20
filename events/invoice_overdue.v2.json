@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "InvoiceOverdue v2",
+  "type": "object",
+  "required": ["event_id","event_type","schema_version","occurred_at","organization_id","partition_key","payload"],
+  "properties": {
+    "event_id": {"type":"string","format":"uuid","description":"ключ дедупликации в processed_event"},
+    "event_type": {"const":"InvoiceOverdue"},
+    "schema_version": {"const":2},
+    "occurred_at": {"type":"string","format":"date-time"},
+    "organization_id": {"type":"string","format":"uuid"},
+    "topic": {"const":"rentflow.invoice"},
+    "partition_key": {"type":"string","description":"invoice_id: все события одного счёта в одной партиции"},
+    "payload": {"type":"object","required":["invoice_id","tenant_id","overdue_since","outstanding"],"properties":{"invoice_id":{"type":"string","format":"uuid"},"tenant_id":{"type":"string","format":"uuid"},"overdue_since":{"type":"string","format":"date"},"outstanding":{"type":"string","pattern":"^[0-9]+\\.[0-9]{2}$"}}}
+  }
+}

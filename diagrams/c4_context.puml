@@ -1,0 +1,23 @@
+@startuml
+!include _style.puml
+!include <C4/C4_Context>
+title RentFlow — C4 Level 1: System Context
+
+Person(manager, "Менеджер УК", "Ведёт объекты, арендаторов и договоры, контролирует дебиторку")
+Person(tenant, "Арендатор", "Получает счета и оплачивает их в личном кабинете")
+Person(admin, "Администратор", "Управляет организациями, ролями и справочниками")
+
+System(rentflow, "RentFlow", "Управление долгосрочной арендой: договоры, ежедневный биллинг, оплата, просрочки и пени, уведомления")
+
+System_Ext(gateway, "Платёжный шлюз", "Приём онлайн-платежей, webhook о статусе")
+System_Ext(email, "E-mail / Push провайдер", "Доставка уведомлений")
+System_Ext(idp, "OAuth 2.0 провайдер", "Аутентификация пользователей, выдача JWT")
+
+Rel(manager, rentflow, "Работает с договорами и счетами", "HTTPS")
+Rel(tenant, rentflow, "Смотрит и оплачивает счета", "HTTPS")
+Rel(admin, rentflow, "Администрирует", "HTTPS")
+Rel(rentflow, gateway, "Создаёт платёж, получает payment_url", "HTTPS/REST")
+Rel_Back(rentflow, gateway, "Webhook о статусе платежа (HMAC)", "HTTPS")
+Rel(rentflow, email, "Отправляет уведомления", "SMTP / HTTPS")
+Rel(rentflow, idp, "Проверяет токены", "OIDC")
+@enduml

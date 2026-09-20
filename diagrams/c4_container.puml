@@ -1,0 +1,38 @@
+@startuml
+!include _style.puml
+!include <C4/C4_Container>
+title RentFlow — C4 Level 2: Container
+
+Person(manager, "Менеджер УК")
+Person(tenant, "Арендатор")
+System_Ext(gateway, "Платёжный шлюз")
+System_Ext(email, "E-mail / Push провайдер")
+
+System_Boundary(rf, "RentFlow") {
+  Container(web, "Web-приложение", "React SPA", "Кабинет менеджера и арендатора (экраны W-01…W-09)")
+  Container(api, "API Gateway", "Spring Cloud Gateway", "Маршрутизация, проверка JWT, rate limiting")
+  Container(core, "Core Service", "Java 17 / Spring Boot", "Объекты, арендаторы, договоры, задачи менеджера")
+  Container(billing, "Billing Service", "Java 17 / Spring Boot", "Ежедневный billing-job 00:05, счета, просрочки, пени")
+  Container(payment, "Payment Service", "Java 17 / Spring Boot", "Инициация оплаты, Idempotency-Key, обработка webhook")
+  Container(notify, "Notification Service", "Java 17 / Spring Boot", "Уведомления арендаторам и менеджерам")
+  ContainerDb(db, "PostgreSQL 15", "RDBMS", "Договоры, счета, платежи, пени, задачи; outbox_event / processed_event; RLS по organization_id; UUIDv7 PK, NUMERIC(14,2)")
+  ContainerQueue(kafka, "Kafka", "Message broker", "InvoiceIssued, InvoiceOverdue, PaymentConfirmed, PaymentRefunded, ContractStatusChanged (envelope v2, transactional outbox), InvoiceOverdue")
+}
+
+Rel(manager, web, "Использует", "HTTPS")
+Rel(tenant, web, "Использует", "HTTPS")
+Rel(web, api, "REST /v1, Bearer JWT", "HTTPS/JSON")
+Rel(api, core, "Проксирует", "REST")
+Rel(api, billing, "Проксирует", "REST")
+Rel(api, payment, "Проксирует", "REST")
+Rel(core, db, "Читает/пишет", "JDBC")
+Rel(billing, db, "Читает/пишет", "JDBC")
+Rel(payment, db, "Читает/пишет", "JDBC")
+Rel(billing, kafka, "Публикует InvoiceIssued, InvoiceOverdue")
+Rel(payment, kafka, "Публикует PaymentConfirmed")
+Rel(kafka, notify, "Потребляет события")
+Rel(kafka, core, "Потребляет InvoiceOverdue → задача менеджеру")
+Rel(payment, gateway, "Создать платёж", "HTTPS/REST")
+Rel_Back(payment, gateway, "Webhook (HMAC)", "HTTPS")
+Rel(notify, email, "Отправляет", "SMTP/HTTPS")
+@enduml

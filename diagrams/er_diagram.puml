@@ -1,0 +1,190 @@
+@startuml er_diagram
+' RentFlow — ER-диаграмма v2.0 (соответствует db/schema.sql)
+hide circle
+skinparam linetype ortho
+skinparam entity {
+  BackgroundColor #F7F9FC
+  BorderColor #3C5A99
+}
+title RentFlow — модель данных v2.0
+
+entity organization {
+  * id : UUID <<PK>>
+  --
+  name
+  timezone : TEXT
+  created_at
+}
+
+entity tenant {
+  * id : UUID <<PK>>
+  --
+  * organization_id : UUID <<FK>>
+  type (PERSON|COMPANY)
+  name, inn, email, phone
+  * type : TEXT <<LEGAL_ENTITY|SOLE_PROPRIETOR|INDIVIDUAL>>
+  archived
+}
+
+entity user_account {
+  * id : UUID <<PK>>
+  --
+  * organization_id : UUID <<FK>>
+  tenant_id : UUID <<FK>> (role=TENANT)
+  email, password_hash, role, active
+}
+
+entity property {
+  * id : UUID <<PK>>
+  --
+  * organization_id : UUID <<FK>>
+  address, area_sqm, type
+  archived
+}
+
+entity contract {
+  * id : UUID <<PK>>
+  --
+  * organization_id : UUID <<FK>>
+  * property_id : UUID <<FK>>
+  * tenant_id : UUID <<FK>>
+  status, rent_amount, currency
+  billing_period, billing_day, grace_days
+  penalty_rate_pct
+  start_date, end_date, next_billing_date
+  EXCLUDE (property_id, period) WHERE ACTIVE/SUSPENDED
+}
+
+entity invoice {
+  * id : UUID <<PK>>
+  --
+  * organization_id : UUID <<FK>>
+  * contract_id : UUID <<FK>>
+  * tenant_id : UUID <<FK>>
+  period_start, period_end, issue_date, due_date
+  currency
+  amount = SUM invoice_line (trigger)
+  penalty_amount = SUM penalty (trigger)
+  paid_amount = SUM payment CONFIRMED (trigger)
+  overpaid_amount : NUMERIC(14,2) <<generated>>
+  status, overdue_since
+  UNIQUE (contract_id, period_start)
+}
+
+entity invoice_line {
+  * id : UUID <<PK>>
+  --
+  * organization_id : UUID <<FK>>
+  * invoice_id : UUID <<FK>>
+  source_invoice_id : UUID <<FK, OVERPAYMENT_CREDIT>>
+  kind (RENT|ADJUSTMENT)
+  description, amount
+}
+
+entity penalty {
+  * id : UUID <<PK>>
+  --
+  * organization_id : UUID <<FK>>
+  * invoice_id : UUID <<FK>>
+  accrual_date, days_overdue
+  base_amount, rate_pct, amount
+  UNIQUE (invoice_id, accrual_date)
+}
+
+entity idempotency_key {
+  * user_id : UUID <<PK,FK>>
+  * key : UUID <<PK>>
+  --
+  request_hash, state
+  response_status, response_body
+  expires_at
+}
+
+entity payment {
+  * id : UUID <<PK>>
+  --
+  * organization_id : UUID <<FK>>
+  * invoice_id : UUID <<FK>>
+  payer_user_id : UUID <<FK>>
+  (idempotency_user_id, idempotency_key) <<FK>>
+  amount, currency, status
+  provider, provider_payment_id
+  failure_reason, confirmed_at, refunded_at
+  UNIQUE (provider, provider_payment_id)
+}
+
+entity task {
+  * id : UUID <<PK>>
+  --
+  * organization_id : UUID <<FK>>
+  type, invoice_id <<FK>>, contract_id <<FK>>
+  assignee_id : UUID <<FK>>
+  title, priority, status, due_at
+  UNIQUE open OVERDUE_FOLLOWUP per invoice
+}
+
+entity notification {
+  * id : UUID <<PK>>
+  --
+  * organization_id : UUID <<FK>>
+  tenant_id <<FK>> | user_id <<FK>> (min 1)
+  type, channel, recipient_address
+  template, text, status, read
+}
+
+entity outbox_event {
+  * id : UUID <<PK>>
+  --
+  * organization_id : UUID <<FK>>
+  aggregate_type, aggregate_id
+  event_type, schema_version
+  topic, partition_key, payload
+  published_at, attempts
+}
+
+entity processed_event {
+  * consumer : TEXT <<PK>>
+  * event_id : UUID <<PK>>
+  --
+  processed_at
+}
+
+entity audit_log {
+  * id : BIGSERIAL <<PK>>
+  --
+  organization_id, entity_type, entity_id
+  action, changed_by, changed_at
+  old_data, new_data : JSONB
+}
+
+organization ||--o{ tenant
+organization ||--o{ user_account
+organization ||--o{ property
+organization ||--o{ contract
+organization ||--o{ invoice
+organization ||--o{ outbox_event
+tenant |o--o{ user_account : role=TENANT
+property ||--o{ contract
+tenant ||--o{ contract
+contract ||--o{ invoice
+tenant ||--o{ invoice
+invoice ||--o{ invoice_line
+invoice |o--o| invoice_line : overpayment credit
+invoice ||--o{ penalty
+invoice ||--o{ payment
+user_account |o--o{ payment : payer
+user_account ||--o{ idempotency_key
+idempotency_key |o--o| payment
+invoice |o--o{ task : OVERDUE_FOLLOWUP
+contract |o--o{ task : CONTRACT_EXPIRING
+user_account |o--o{ task : assignee
+tenant |o--o{ notification
+user_account |o--o{ notification
+
+note as N1
+  organization_id во всех бизнес-таблицах + RLS (ADR-0006)
+  Просрочка счёта — ось overdue_since, статуса OVERDUE нет (ADR-0005)
+  Пеня хранится только в penalty; invoice.penalty_amount — агрегат (ADR-0004)
+  Kafka: outbox_event -> topic; inbox processed_event (consumer, event_id) (ADR-0003)
+end note
+@enduml

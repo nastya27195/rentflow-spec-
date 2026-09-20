@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RentFlow — прототип веб-интерфейса</title>
+<style>
+:root{--bg:#f4f6f9;--card:#fff;--line:#e3e7ee;--text:#1d2433;--muted:#6b7686;--accent:#2f6fed;--accent-soft:#e8effd;--danger:#d64545;--ok:#1f9d5a;--warn:#d98a11;}
+*{box-sizing:border-box}
+body{margin:0;font-family:-apple-system,"Segoe UI",Roboto,Arial,sans-serif;background:var(--bg);color:var(--text);font-size:14px}
+.top{height:52px;background:#1b2436;color:#fff;display:flex;align-items:center;padding:0 16px;gap:16px}
+.logo{font-weight:700;letter-spacing:.3px;font-size:16px}
+.logo span{color:#7fb0ff}
+.top .spacer{flex:1}
+.role{display:flex;background:#2a3550;border-radius:8px;padding:3px}
+.role button{background:transparent;border:0;color:#b8c2d6;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:13px}
+.role button.on{background:#fff;color:#1b2436;font-weight:600}
+.user{font-size:13px;color:#b8c2d6}
+.main{padding:20px 24px;max-width:1100px;margin:0 auto}
+h1{font-size:20px;margin:0 0 4px}
+.sub{color:var(--muted);margin-bottom:16px}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.kpi .l{color:var(--muted);font-size:12px}
+.kpi .v{font-size:22px;font-weight:700;margin-top:4px}
+.kpi .d{font-size:12px;margin-top:2px;color:var(--muted)}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:16px}
+.panel h3{margin:0 0 10px;font-size:15px}
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
+input,select{border:1px solid #cfd6e1;border-radius:8px;padding:8px 10px;font-size:13px;background:#fff;color:var(--text)}
+input:focus,select:focus{outline:2px solid var(--accent-soft);border-color:var(--accent)}
+.btn{border:1px solid #cfd6e1;background:#fff;color:var(--text);padding:8px 14px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:500}
+.btn:hover{background:#f6f8fb}
+.btn.p{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.p:hover{background:#2459c9}
+.btn.d{color:var(--danger);border-color:#f0c4c4}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn.sm{padding:5px 10px;font-size:12px}
+table{width:100%;border-collapse:collapse;background:#fff}
+th{font-size:12px;color:var(--muted);text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);font-weight:600;white-space:nowrap}
+td{padding:10px;border-bottom:1px solid #eef1f6;vertical-align:middle}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+.badge{display:inline-block;padding:3px 9px;border-radius:12px;font-size:11px;font-weight:600;white-space:nowrap}
+.s-ISSUED{background:#e8effd;color:#2f6fed}
+.s-PARTIALLY_PAID{background:#fff3e0;color:#b86e0a}
+.s-PAID{background:#e4f6ec;color:#1f9d5a}
+.s-overdue{background:#fde8e8;color:#c93838}
+.ovd{display:inline-block;margin-left:4px;padding:1px 6px;border-radius:8px;background:#fde8e8;color:#c93838;font-size:11px}
+.s-CANCELLED{background:#f0f0f0;color:#888;text-decoration:line-through}
+.s-PENDING{background:#fff3e0;color:#b86e0a}
+.s-CONFIRMED{background:#e4f6ec;color:#1f9d5a}
+.bar{height:8px;background:#eef1f6;border-radius:4px;overflow:hidden;margin-top:6px}
+.bar i{display:block;height:100%;background:var(--ok)}
+.legend{font-size:12px;color:var(--muted);margin-top:8px}
+.note{font-size:12px;color:var(--muted);margin-top:4px}
+.empty{color:var(--muted);padding:24px;text-align:center}
+.row-inv{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid #eef1f6;gap:12px}
+.row-inv:last-child{border-bottom:0}
+.row-inv .a{font-size:16px;font-weight:700;white-space:nowrap}
+.warnbox{background:#fff8ec;border:1px solid #f4dcae;border-radius:8px;padding:10px 12px;font-size:13px;margin-bottom:12px}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-bottom:12px}
+.tabs button{border:0;background:transparent;padding:8px 12px;cursor:pointer;color:var(--muted);border-bottom:2px solid transparent;font-size:13px}
+.tabs button.on{color:var(--accent);border-bottom-color:var(--accent);font-weight:600}
+.overlay{position:fixed;inset:0;background:rgba(20,26,40,.45);display:none;align-items:center;justify-content:center;z-index:10}
+.overlay.on{display:flex}
+.modal{background:#fff;border-radius:12px;width:420px;max-width:92vw;padding:20px 22px;box-shadow:0 20px 60px rgba(0,0,0,.25)}
+.modal h3{margin:0 0 6px;font-size:17px}
+.modal .hint{color:var(--muted);font-size:12px;margin-bottom:14px}
+.field{margin-bottom:12px}
+.field label{display:block;font-size:12px;color:var(--muted);margin-bottom:4px}
+.field input,.field select{width:100%}
+.mfoot{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}
+.toast{position:fixed;right:20px;bottom:20px;background:#1b2436;color:#fff;padding:12px 16px;border-radius:10px;font-size:13px;opacity:0;transform:translateY(10px);transition:.25s;z-index:20;max-width:360px}
+.toast.on{opacity:1;transform:none}
+.pay-state{text-align:center;padding:16px 0}
+.spin{width:36px;height:36px;border:4px solid #e3e7ee;border-top-color:var(--accent);border-radius:50%;animation:sp 1s linear infinite;margin:0 auto 12px}
+@keyframes sp{to{transform:rotate(360deg)}}
+.chk{font-size:40px;color:var(--ok)}
+.total{display:flex;justify-content:space-between;padding:6px 0;font-size:13px}
+.total.big{font-size:15px;font-weight:700;border-top:1px solid var(--line);margin-top:4px;padding-top:10px}
+</style>
+</head>
+<body>
+<div class="top">
+  <div class="logo">Rent<span>Flow</span></div>
+  <div class="spacer"></div>
+  <div class="role">
+    <button id="r-manager" class="on" onclick="setRole('manager')">УК / менеджер</button>
+    <button id="r-tenant" onclick="setRole('tenant')">Арендатор</button>
+  </div>
+  <div class="user" id="user">Анастасия Ю. · УК «Северный квартал»</div>
+</div>
+<main class="main" id="main"></main>
+<div class="overlay" id="overlay"><div class="modal" id="modal"></div></div>
+<div class="toast" id="toast"></div>
+
+<script>
+const fmt = n => n.toLocaleString('ru-RU',{minimumFractionDigits:2,maximumFractionDigits:2}) + ' ₽';
+const dt = s => s ? s.split('-').reverse().join('.') : '—';
+const TODAY = '2026-09-14';
+const TENANT = 't3';
+const tenants = {t1:'ООО «Альфа Ритейл»', t2:'ИП Смирнова Е.В.', t3:'ООО «Кофе Пойнт»'};
+const contracts = {c1:{number:'ДА-2025/014',addr:'ул. Ленина, 12, пом. 3',penalty:0.1}, c2:{number:'ДА-2025/031',addr:'пр. Мира, 44, оф. 210',penalty:0.1}, c3:{number:'ДА-2026/007',addr:'ул. Садовая, 7, пом. 1',penalty:0.05}};
+let invoices = [
+  {id:'i1', number:'INV-2026-09-0001', contract:'c1', tenant:'t1', period:'Аренда, сентябрь 2026', due:'2026-09-11', amount:172000, paid:172000, penalty:0, status:'PAID'},
+  {id:'i2', number:'INV-2026-09-0002', contract:'c2', tenant:'t2', period:'Аренда, сентябрь 2026', due:'2026-09-12', amount:81000, paid:0, penalty:162, status:'ISSUED', overdueSince:'2026-09-13'},
+  {id:'i3', number:'INV-2026-09-0003', contract:'c3', tenant:'t3', period:'Аренда, сентябрь 2026', due:'2026-09-11', amount:64000, paid:30000, penalty:51, status:'PARTIALLY_PAID', overdueSince:'2026-09-12'},
+  {id:'i4', number:'INV-2026-09-0004', contract:'c1', tenant:'t1', period:'Коммунальные услуги, август 2026', due:'2026-09-20', amount:14380, paid:0, penalty:0, status:'ISSUED'},
+  {id:'i5', number:'INV-2026-09-0005', contract:'c3', tenant:'t3', period:'Коммунальные услуги, август 2026', due:'2026-09-20', amount:6120, paid:0, penalty:0, status:'ISSUED'},
+  {id:'i6', number:'INV-2026-08-0003', contract:'c3', tenant:'t3', period:'Аренда, август 2026', due:'2026-08-11', amount:64000, paid:64000, penalty:0, status:'PAID'},
+  {id:'i7', number:'INV-2026-08-0002', contract:'c2', tenant:'t2', period:'Аренда, август 2026', due:'2026-08-12', amount:81000, paid:81000, penalty:0, status:'PAID'},
+];
+let payments = [
+  {invoice:'i1', date:'03.09.2026 14:12', amount:172000, method:'Карта', status:'CONFIRMED'},
+  {invoice:'i3', date:'09.09.2026 10:40', amount:30000, method:'СБП', status:'CONFIRMED'},
+  {invoice:'i6', date:'06.08.2026 18:30', amount:64000, method:'Карта', status:'CONFIRMED'},
+  {invoice:'i7', date:'08.08.2026 09:02', amount:81000, method:'Карта', status:'CONFIRMED'},
+];
+const STATUS = {ISSUED:'Выставлен',PARTIALLY_PAID:'Частично оплачен',PAID:'Оплачен',CANCELLED:'Аннулирован',PENDING:'Ожидает',CONFIRMED:'Подтверждён'};
+const badge = s => `<span class="badge s-${s}">${STATUS[s]||s}</span>`;
+const I = id => invoices.find(x=>x.id===id);
+const rest = i => i.amount + i.penalty - i.paid;
+const OPEN = ['ISSUED','PARTIALLY_PAID'];
+const isOverdue = i => !!i.overdueSince && OPEN.includes(i.status);
+const now = () => dt(TODAY)+' '+new Date().toTimeString().slice(0,5);
+
+const state = {role:'manager', filter:'ALL', q:'', tab:'active'};
+
+function setRole(r){state.role=r;
+  document.getElementById('r-manager').classList.toggle('on',r==='manager');
+  document.getElementById('r-tenant').classList.toggle('on',r==='tenant');
+  document.getElementById('user').textContent = r==='manager'?'Анастасия Ю. · УК «Северный квартал»':'Козлов А.Н. · ООО «Кофе Пойнт»';
+  render();}
+function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('on');clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove('on'),2800);}
+function modal(html){document.getElementById('modal').innerHTML=html;document.getElementById('overlay').classList.add('on');}
+function closeModal(){document.getElementById('overlay').classList.remove('on');}
+document.getElementById('overlay').addEventListener('click',e=>{if(e.target.id==='overlay')closeModal();});
+function render(){document.getElementById('main').innerHTML = state.role==='manager'?managerScreen():tenantScreen();}
+
+// ---------- Экран УК / менеджера / собственника ----------
+function managerScreen(){
+  const open=invoices.filter(i=>OPEN.includes(i.status)), overdue=invoices.filter(isOverdue);
+  const sep=invoices.filter(i=>i.number.startsWith('INV-2026-09')&&i.status!=='CANCELLED');
+  const collected=sep.reduce((s,i)=>s+i.paid,0), total=sep.reduce((s,i)=>s+i.amount,0), pct=Math.round(collected/total*100);
+  const list=invoices.filter(i=>(state.filter==='ALL'||(state.filter==='OVERDUE'?isOverdue(i):i.status===state.filter))&&(!state.q||(i.number+tenants[i.tenant]+contracts[i.contract].number).toLowerCase().includes(state.q.toLowerCase())));
+  return `<h1>Счета и задолженность</h1><div class="sub">Портфель УК «Северный квартал» на ${dt(TODAY)} · биллинг запускается ежедневно в 00:05</div>
+  <div class="cards">
+    <div class="card kpi"><div class="l">Активных договоров</div><div class="v">3</div><div class="d">по 3 объектам</div></div>
+    <div class="card kpi"><div class="l">Открытых счетов</div><div class="v">${open.length}</div><div class="d">на ${fmt(open.reduce((s,i)=>s+rest(i),0))}</div></div>
+    <div class="card kpi"><div class="l">Просрочено</div><div class="v" style="color:var(--danger)">${overdue.length}</div><div class="d" style="color:var(--danger)">долг ${fmt(overdue.reduce((s,i)=>s+rest(i),0))}</div></div>
+    <div class="card kpi"><div class="l">Собираемость, сентябрь</div><div class="v">${pct}%</div><div class="bar"><i style="width:${pct}%"></i></div></div>
+  </div>
+  <div class="panel"><div class="toolbar">
+    <input placeholder="Номер счёта, арендатор, договор" style="width:280px" value="${state.q}" oninput="state.q=this.value;render();const e=document.querySelector('.toolbar input');e.focus();e.setSelectionRange(e.value.length,e.value.length)">
+    <select onchange="state.filter=this.value;render()">${['ALL','ISSUED','PARTIALLY_PAID','OVERDUE'/*UI-фильтр: overdueSince!=null, не статус БД*/,'PAID','CANCELLED'].map(s=>`<option value="${s}" ${state.filter===s?'selected':''}>${s==='ALL'?'Все статусы':STATUS[s]}</option>`).join('')}</select>
+    <span style="flex:1"></span>
+    <button class="btn p" onclick="modalNewInvoice()">+ Выставить счёт</button>
+  </div>
+  <table><thead><tr><th>Номер</th><th>Арендатор</th><th>Договор · объект</th><th>Назначение</th><th>Срок оплаты</th><th class="num">Сумма</th><th class="num">Пеня</th><th class="num">К оплате</th><th>Статус</th><th></th></tr></thead><tbody>
+  ${list.length?list.map(i=>`<tr><td><b>${i.number}</b></td><td>${tenants[i.tenant]}</td><td>${contracts[i.contract].number}<div class="note">${contracts[i.contract].addr}</div></td><td>${i.period}</td><td style="color:${isOverdue(i)?'var(--danger)':'inherit'}">${dt(i.due)}</td><td class="num">${fmt(i.amount)}</td><td class="num">${i.penalty?fmt(i.penalty):'—'}</td><td class="num"><b>${i.status==='CANCELLED'?'—':fmt(rest(i))}</b></td><td>${badge(i.status)}</td>
+    <td style="white-space:nowrap">${OPEN.includes(i.status)?`<button class="btn sm" onclick="modalManualPay('${i.id}')">Зачесть оплату</button> <button class="btn sm" onclick="toast('Напоминание отправлено: ${tenants[i.tenant]} (email, push)')">Напомнить</button> <button class="btn sm d" ${i.paid?'disabled title="Есть оплата — аннулирование недоступно"':''} onclick="cancelInv('${i.id}')">Аннулировать</button>`:''}</td></tr>`).join(''):'<tr><td colspan="10" class="empty">Ничего не найдено</td></tr>'}
+  </tbody></table>
+  <div class="legend">Показано ${list.length} из ${invoices.length} · остаток к оплате по выборке: <b>${fmt(list.filter(i=>i.status!=='CANCELLED').reduce((s,i)=>s+rest(i),0))}</b></div></div>`;
+}
+function modalNewInvoice(){modal(`<h3>Выставить счёт вручную</h3><div class="hint">Разовый счёт вне графика биллинга (FR-22)</div>
+<div class="field"><label>Договор</label><select id="ni-c">${Object.entries(contracts).map(([id,c])=>`<option value="${id}">${c.number} · ${tenants[id.replace('c','t')]}</option>`).join('')}</select></div>
+<div class="field"><label>Назначение</label><input id="ni-p" placeholder="Коммунальные услуги, сентябрь 2026"></div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><div class="field"><label>Сумма, ₽</label><input id="ni-a" type="number" placeholder="0"></div><div class="field"><label>Срок оплаты</label><input id="ni-d" type="date" value="2026-09-24"></div></div>
+<div class="mfoot"><button class="btn" onclick="closeModal()">Отмена</button><button class="btn p" onclick="createInvoice()">Выставить</button></div>`);}
+function createInvoice(){const c=document.getElementById('ni-c').value,a=+document.getElementById('ni-a').value,p=document.getElementById('ni-p').value||'Разовое начисление',d=document.getElementById('ni-d').value;
+  if(!a||a<=0){toast('Укажите сумму больше нуля');return;}
+  const n=invoices.length+1;invoices.unshift({id:'i'+n,number:'INV-2026-09-'+String(n).padStart(4,'0'),contract:c,tenant:c.replace('c','t'),period:p,due:d,amount:a,paid:0,penalty:0,status:'ISSUED'});
+  closeModal();toast('Счёт выставлен, арендатор уведомлён');render();}
+function modalManualPay(id){const i=I(id);modal(`<h3>Зачесть оплату по ${i.number}</h3><div class="hint">Для платежей по безналу вне шлюза (FR-33). Остаток: ${fmt(rest(i))}</div>
+<div class="field"><label>Сумма, ₽</label><input id="mp-a" type="number" value="${rest(i)}"></div>
+<div class="field"><label>Основание</label><input placeholder="п/п № 118 от 14.09.2026"></div>
+<div class="mfoot"><button class="btn" onclick="closeModal()">Отмена</button><button class="btn p" onclick="applyPayment('${id}',+document.getElementById('mp-a').value,'Банк. перевод','CONFIRMED');closeModal();render()">Зачесть</button></div>`);}
+function cancelInv(id){const i=I(id);i.status='CANCELLED';toast('Счёт '+i.number+' аннулирован');render();}
+function applyPayment(id,amount,method,status){const i=I(id);if(!amount||amount<=0){toast('Некорректная сумма');return false;}if(amount>rest(i)+0.005){toast('Сумма превышает остаток ('+fmt(rest(i))+')');return false;}
+  payments.unshift({invoice:id,date:now(),amount,method,status});
+  if(status==='CONFIRMED'){i.paid+=amount;i.status=rest(i)<=0.005?'PAID':'PARTIALLY_PAID';if(i.status==='PAID')i.overdueSince=null;toast(i.status==='PAID'?'Счёт полностью оплачен':'Частичная оплата зачтена, остаток '+fmt(rest(i)));}
+  return true;}
+
+// ---------- Экран арендатора ----------
+function tenantScreen(){
+  const my=invoices.filter(i=>i.tenant===TENANT&&i.status!=='CANCELLED');
+  const open=my.filter(i=>OPEN.includes(i.status)), paid=my.filter(i=>i.status==='PAID');
+  const debt=open.reduce((s,i)=>s+rest(i),0);
+  const list=state.tab==='active'?open:paid;
+  const myPays=payments.filter(p=>I(p.invoice).tenant===TENANT);
+  return `<h1>Мои счета</h1><div class="sub">${tenants[TENANT]} · договор ${contracts.c3.number} · ${contracts.c3.addr}</div>
+  <div class="cards">
+    <div class="card kpi"><div class="l">К оплате всего</div><div class="v" style="color:${debt?'var(--danger)':'var(--ok)'}">${fmt(debt)}</div><div class="d">${open.length} счёт(а)</div></div>
+    <div class="card kpi"><div class="l">Ближайший срок</div><div class="v">${open.length?dt(open.slice().sort((a,b)=>a.due.localeCompare(b.due))[0].due):'—'}</div></div>
+    <div class="card kpi"><div class="l">Оплачено за 2026 г.</div><div class="v">${fmt(paid.reduce((s,i)=>s+i.paid,0))}</div></div>
+  </div>
+  ${open.some(isOverdue)?`<div class="warnbox">⚠ Есть просроченные счета. По договору начисляется пеня ${contracts.c3.penalty}% в день от неоплаченной суммы.</div>`:''}
+  <div class="panel"><div class="tabs"><button class="${state.tab==='active'?'on':''}" onclick="state.tab='active';render()">К оплате (${open.length})</button><button class="${state.tab==='paid'?'on':''}" onclick="state.tab='paid';render()">Оплаченные (${paid.length})</button></div>
+  ${list.length?list.map(i=>`<div class="row-inv"><div><div><b>${i.period}</b> · ${i.number}</div><div class="note">Срок оплаты <span style="color:${isOverdue(i)?'var(--danger)':'inherit'}">${dt(i.due)}</span> · ${badge(i.status)}${i.penalty?` · пеня ${fmt(i.penalty)}`:''}${i.paid&&i.status!=='PAID'?` · оплачено ${fmt(i.paid)}`:''}</div></div>
+    <div style="display:flex;align-items:center;gap:14px"><div class="a">${fmt(i.status==='PAID'?i.amount:rest(i))}</div>${i.status!=='PAID'?`<button class="btn p" onclick="modalPay('${i.id}')">Оплатить</button>`:`<button class="btn sm" onclick="toast('Квитанция отправлена на e-mail')">Квитанция</button>`}</div></div>`).join(''):'<div class="empty">Открытых счетов нет 🎉</div>'}</div>
+  <div class="panel"><h3>История платежей</h3>${myPays.length?`<table><thead><tr><th>Дата</th><th>Счёт</th><th>Способ</th><th class="num">Сумма</th><th>Статус</th></tr></thead><tbody>${myPays.map(p=>`<tr><td>${p.date}</td><td>${I(p.invoice).number}</td><td>${p.method}</td><td class="num">${fmt(p.amount)}</td><td>${badge(p.status)}</td></tr>`).join('')}</tbody></table>`:'<div class="empty">Платежей ещё не было</div>'}
+  <div class="note">Оплата проходит через защищённый платёжный шлюз; статус обновляется автоматически после подтверждения банком. Вопросы по счетам: менеджер Анастасия Ю., +7 (495) 000-11-22.</div></div>`;
+}
+function modalPay(id){const i=I(id);modal(`<h3>Оплата счёта ${i.number}</h3><div class="hint">Idempotency-Key формируется автоматически — повторное нажатие не создаст второй платёж</div>
+<div class="total"><span>${i.period}</span><span>${fmt(i.amount)}</span></div>${i.penalty?`<div class="total"><span>Пеня</span><span style="color:var(--danger)">${fmt(i.penalty)}</span></div>`:''}${i.paid?`<div class="total"><span>Оплачено ранее</span><span style="color:var(--ok)">− ${fmt(i.paid)}</span></div>`:''}<div class="total big"><span>К оплате</span><span>${fmt(rest(i))}</span></div>
+<div class="field" style="margin-top:12px"><label>Сумма, ₽ (можно оплатить частично)</label><input id="pay-a" type="number" value="${rest(i)}" step="0.01"></div>
+<div class="field"><label>Способ оплаты</label><select id="pay-m"><option>Банковская карта</option><option>СБП</option></select></div>
+<div class="mfoot"><button class="btn" onclick="closeModal()">Отмена</button><button class="btn p" onclick="startPay('${id}')">Перейти к оплате</button></div>`);}
+function startPay(id){const i=I(id),a=+document.getElementById('pay-a').value,m=document.getElementById('pay-m').value==='СБП'?'СБП':'Карта';
+  if(!a||a<=0){toast('Введите сумму');return;}if(a>rest(i)+0.005){toast('Сумма больше остатка к оплате');return;}
+  const p={invoice:id,date:now(),amount:a,method:m,status:'PENDING'};payments.unshift(p);
+  modal(`<div class="pay-state"><div class="spin"></div><h3>Платёж обрабатывается</h3><div class="hint">Статус: ${badge('PENDING')} · ждём подтверждение платёжного шлюза…</div></div>`);render();
+  setTimeout(()=>{p.status='CONFIRMED';i.paid+=a;i.status=rest(i)<=0.005?'PAID':'PARTIALLY_PAID';if(i.status==='PAID')i.overdueSince=null;
+    modal(`<div class="pay-state"><div class="chk">✓</div><h3>Оплата прошла</h3><div class="hint">${fmt(a)} зачислено по счёту ${i.number}. ${i.status==='PAID'?'Счёт полностью оплачен.':'Остаток к оплате: '+fmt(rest(i))+'.'}<br>Квитанция отправлена на e-mail.</div><button class="btn p" onclick="closeModal()">Готово</button></div>`);render();},1800);}
+
+render();
+</script>
+</body>
+</html>

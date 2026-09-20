@@ -1,0 +1,49 @@
+@startuml
+!include _style.puml
+title RentFlow — Обработка просрочки и начисление пени (UC-04, v2.0)
+participant "Scheduler\n(cron 00:30, tz организации)" as Cron
+participant "Billing Service\n(overdue-job)" as Billing
+database "PostgreSQL" as DB
+queue "Kafka\n(outbox relay)" as Kafka
+participant "Task Service" as Task
+participant "Notification\nService" as Notif
+actor "Арендатор" as Tenant
+actor "Менеджер" as Manager
+
+Cron -> Billing : runOverdue(today)
+activate Billing
+Billing -> DB : SELECT invoice WHERE status IN (ISSUED, PARTIALLY_PAID)\nAND due_date + grace_days < today(org.tz)\nFOR UPDATE SKIP LOCKED
+DB --> Billing : список счетов
+loop для каждого счёта
+  alt overdue_since IS NULL (первый день просрочки)
+    Billing -> DB : UPDATE invoice SET overdue_since = today\n(status не меняется — ADR-0005)
+    Billing -> DB : INSERT outbox_event (InvoiceOverdue v2)
+    note right : одна транзакция:\ninvoice + outbox_event
+  else overdue_since IS NOT NULL (просрочка продолжается)
+    Billing -> Billing : пеня за день =\nостаток долга × penalty_rate_pct / 100
+    Billing -> DB : INSERT penalty (invoice_id, accrual_date, amount)\n[UNIQUE (invoice_id, accrual_date) — без дублей]
+    Billing -> DB : UPDATE invoice SET penalty_amount = SUM(penalty.amount)
+  end
+end
+deactivate Billing
+DB -> Kafka : outbox relay публикует InvoiceOverdue
+Kafka -> Task : InvoiceOverdue
+activate Task
+Task -> DB : processed_event(consumer='task', event_id)?
+alt событие новое
+  Task -> DB : есть открытая задача\nOVERDUE_FOLLOWUP по счёту?
+  alt задачи нет
+    Task -> DB : INSERT task (type=OVERDUE_FOLLOWUP, status=NEW)
+    Task -> Manager : задача «Просрочка по счёту №…»
+  else задача уже есть
+    Task -> Task : пропустить (одна открытая задача на счёт)
+  end
+  Task -> DB : INSERT processed_event
+else дубль события
+  Task -> Task : ack без обработки
+end
+deactivate Task
+Kafka -> Notif : InvoiceOverdue
+Notif -> DB : processed_event(consumer='notification', event_id)?
+Notif -> Tenant : «Счёт просрочен, начисляется пеня …%/день»\n(notification: channel, template, status)
+@enduml

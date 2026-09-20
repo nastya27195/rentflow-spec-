@@ -1,0 +1,17 @@
+@startuml
+!include _style.puml
+title RentFlow — Жизненный цикл договора (Contract)
+[*] --> DRAFT : создан менеджером\n[обязательные поля заполнены]
+DRAFT --> ACTIVE : активирован менеджером\n[объект FREE, даты валидны]
+DRAFT --> CANCELLED : отменён менеджером
+ACTIVE --> TERMINATED : расторгнут досрочно\n[открытые счета сохраняются]
+ACTIVE --> EXPIRED : end_date наступила\n[автоматически, billing job]
+TERMINATED --> [*]
+EXPIRED --> [*]
+CANCELLED --> [*]
+note right of ACTIVE
+  Только для ACTIVE:
+  ежедневный billing run формирует счета,
+  объект переходит в статус RENTED
+end note
+@enduml

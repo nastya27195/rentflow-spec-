@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "InvoiceIssued v2",
+  "type": "object",
+  "required": ["event_id","event_type","schema_version","occurred_at","organization_id","partition_key","payload"],
+  "properties": {
+    "event_id": {"type":"string","format":"uuid","description":"ключ дедупликации в processed_event"},
+    "event_type": {"const":"InvoiceIssued"},
+    "schema_version": {"const":2},
+    "occurred_at": {"type":"string","format":"date-time"},
+    "organization_id": {"type":"string","format":"uuid"},
+    "topic": {"const":"rentflow.invoice"},
+    "partition_key": {"type":"string","description":"invoice_id: все события одного счёта в одной партиции"},
+    "payload": {"type":"object","required":["invoice_id","contract_id","tenant_id","amount","currency","due_date"],"properties":{"invoice_id":{"type":"string","format":"uuid"},"contract_id":{"type":"string","format":"uuid"},"tenant_id":{"type":"string","format":"uuid"},"amount":{"type":"string","pattern":"^[0-9]+\\.[0-9]{2}$"},"currency":{"type":"string","minLength":3,"maxLength":3},"due_date":{"type":"string","format":"date"}}}
+  }
+}

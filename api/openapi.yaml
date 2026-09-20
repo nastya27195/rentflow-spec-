@@ -1,0 +1,512 @@
+openapi: 3.0.3
+info:
+  title: RentFlow API
+  version: 2.0.12
+  description: Управление долгосрочной арендой с автоматическим биллингом.
+servers:
+  - url: https://api.rentflow.ru/v1
+security:
+  - bearerAuth: []
+tags:
+  - name: auth
+  - name: users
+  - name: properties
+  - name: tenants
+  - name: contracts
+  - name: invoices
+  - name: payments
+  - name: webhooks
+  - name: tasks
+  - name: notifications
+paths:
+  /auth/login:
+    post:
+      operationId: authLogin
+      tags: [auth]
+      summary: Вход по e-mail и паролю (выдача access/refresh)
+      security: []
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/LoginRequest'}}}}
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/TokenPair'}}}}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  /auth/refresh:
+    post:
+      operationId: authRefresh
+      tags: [auth]
+      summary: Обновить пару токенов по refresh-токену (ротация, старый refresh инвалидируется)
+      security: []
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/RefreshRequest'}}}}
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/TokenPair'}}}}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+  /auth/invitations/{token}/accept:
+    parameters:
+      - {name: token, in: path, required: true, description: Одноразовый токен приглашения из ссылки (TTL 72 ч, FR-51), schema: {type: string, minLength: 32, maxLength: 128}}
+    post:
+      operationId: authInvitationAccept
+      tags: [auth]
+      summary: Принять приглашение и задать пароль (активация пользователя)
+      description: Пароль хэшируется argon2id и сохраняется в user_account.password_hash (ADR-0009); токен приглашения помечается использованным; пользователь получает is_active = true и last_login_at.
+      security: []
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/InvitationAccept'}}}}
+      responses:
+        '200': {description: Пароль задан, пользователь активирован, content: {application/json: {schema: {$ref: '#/components/schemas/TokenPair'}}}}
+        '410': {$ref: '#/components/responses/Gone'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+  /users/{id}:
+    parameters: [ {$ref: '#/components/parameters/Id'} ]
+    get:
+      operationId: getUser
+      tags: [users]
+      summary: Карточка пользователя (ADMIN — любой пользователь своей организации, остальные — только себя)
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/User'}}}}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /properties:
+    get:
+      operationId: listProperties
+      tags: [properties]
+      summary: Список объектов
+      parameters: [ {$ref: '#/components/parameters/Page'}, {$ref: '#/components/parameters/Size'} ]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/PropertyPage'}}}}
+    post:
+      operationId: createProperty
+      tags: [properties]
+      summary: Создать объект
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/PropertyCreate'}}}}
+      responses:
+        '201': {description: Создан, content: {application/json: {schema: {$ref: '#/components/schemas/Property'}}}}
+        '422': {$ref: '#/components/responses/ValidationError'}
+  /properties/{id}:
+    parameters: [ {$ref: '#/components/parameters/Id'} ]
+    get:
+      operationId: getProperty
+      tags: [properties]
+      summary: Карточка объекта
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/Property'}}}}
+        '404': {$ref: '#/components/responses/NotFound'}
+    patch:
+      operationId: updateProperty
+      tags: [properties]
+      summary: Изменить объект
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/PropertyCreate'}}}}
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/Property'}}}}
+    delete:
+      operationId: deleteProperty
+      tags: [properties]
+      summary: Архивировать объект
+      responses:
+        '204': {description: Архивирован}
+        '409': {$ref: '#/components/responses/Conflict'}
+  /tenants:
+    get:
+      operationId: listTenants
+      tags: [tenants]
+      summary: Список арендаторов
+      parameters: [ {$ref: '#/components/parameters/Page'}, {$ref: '#/components/parameters/Size'} ]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {type: array, items: {$ref: '#/components/schemas/Tenant'}}}}}
+    post:
+      operationId: createTenant
+      tags: [tenants]
+      summary: Создать арендатора
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/TenantCreate'}}}}
+      responses:
+        '201': {description: Создан, content: {application/json: {schema: {$ref: '#/components/schemas/Tenant'}}}}
+  /tenants/{id}:
+    parameters: [ {$ref: '#/components/parameters/Id'} ]
+    get:
+      operationId: getTenant
+      tags: [tenants]
+      summary: Карточка арендатора
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/Tenant'}}}}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /contracts:
+    get:
+      operationId: listContracts
+      tags: [contracts]
+      summary: Список договоров
+      parameters:
+        - {$ref: '#/components/parameters/Page'}
+        - {$ref: '#/components/parameters/Size'}
+        - {name: status, in: query, schema: {$ref: '#/components/schemas/ContractStatus'}}
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {type: array, items: {$ref: '#/components/schemas/Contract'}}}}}
+    post:
+      operationId: createContract
+      tags: [contracts]
+      summary: Создать договор (DRAFT)
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/ContractCreate'}}}}
+      responses:
+        '201': {description: Создан, content: {application/json: {schema: {$ref: '#/components/schemas/Contract'}}}}
+        '422': {$ref: '#/components/responses/ValidationError'}
+  /contracts/{id}:
+    parameters: [ {$ref: '#/components/parameters/Id'} ]
+    get:
+      operationId: getContract
+      tags: [contracts]
+      summary: Карточка договора
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/Contract'}}}}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /contracts/{id}/activate:
+    parameters: [ {$ref: '#/components/parameters/Id'} ]
+    post:
+      operationId: activateContract
+      tags: [contracts]
+      summary: Активировать договор
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/Contract'}}}}
+        '409': {$ref: '#/components/responses/Conflict'}
+  /contracts/{id}/suspend:
+    parameters: [ {$ref: '#/components/parameters/Id'} ]
+    post:
+      operationId: suspendContract
+      tags: [contracts]
+      summary: Приостановить договор
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/Contract'}}}}
+        '409': {$ref: '#/components/responses/Conflict'}
+  /contracts/{id}/terminate:
+    parameters: [ {$ref: '#/components/parameters/Id'} ]
+    post:
+      operationId: terminateContract
+      tags: [contracts]
+      summary: Расторгнуть договор
+      requestBody: {content: {application/json: {schema: {type: object, properties: {reason: {type: string}, force: {type: boolean, default: false}}}}}}
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/Contract'}}}}
+        '409': {$ref: '#/components/responses/Conflict'}
+  /invoices:
+    get:
+      operationId: listInvoices
+      tags: [invoices]
+      summary: Список счетов
+      parameters:
+        - {$ref: '#/components/parameters/Page'}
+        - {$ref: '#/components/parameters/Size'}
+        - {name: status, in: query, schema: {$ref: '#/components/schemas/InvoiceStatus'}}
+        - {name: contract_id, in: query, schema: {type: string, format: uuid}}
+        - {name: tenant_id, in: query, schema: {type: string, format: uuid}}
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {type: array, items: {$ref: '#/components/schemas/Invoice'}}}}}
+  /invoices/{id}:
+    parameters: [ {$ref: '#/components/parameters/Id'} ]
+    get:
+      operationId: getInvoice
+      tags: [invoices]
+      summary: Карточка счёта
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/Invoice'}}}}
+        '404': {$ref: '#/components/responses/NotFound'}
+    patch:
+      operationId: updateInvoice
+      tags: [invoices]
+      summary: Скорректировать счёт (менеджер, до оплаты)
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/InvoiceAdjust'}}}}
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/Invoice'}}}}
+        '409': {$ref: '#/components/responses/Conflict'}
+  /invoices/{id}/cancel:
+    parameters: [ {$ref: '#/components/parameters/Id'} ]
+    post:
+      operationId: cancelInvoice
+      tags: [invoices]
+      summary: Отменить счёт
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/Invoice'}}}}
+        '409': {$ref: '#/components/responses/Conflict'}
+  /invoices/{id}/payments:
+    parameters: [ {$ref: '#/components/parameters/Id'} ]
+    post:
+      operationId: createInvoicePayment
+      tags: [payments]
+      summary: Инициировать оплату счёта через платёжный шлюз
+      description: |
+        Идемпотентный метод. Повтор с тем же Idempotency-Key возвращает тот же платёж (200).
+        Счёт должен принадлежать арендатору из токена и быть в статусе ISSUED или PARTIALLY_PAID (просроченный счёт с `overdue_since` оплачивать можно).
+      parameters: [ {$ref: '#/components/parameters/IdempotencyKey'} ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/PaymentInit'}
+      responses:
+        '201': {description: Платёж создан (PENDING), content: {application/json: {schema: {$ref: '#/components/schemas/PaymentInitResult'}}}}
+        '200': {description: Повтор по тому же Idempotency-Key, content: {application/json: {schema: {$ref: '#/components/schemas/PaymentInitResult'}}}}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+        '502': {description: Платёжный шлюз недоступен, content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}}
+  /payments/{id}:
+    parameters: [ {$ref: '#/components/parameters/Id'} ]
+    get:
+      operationId: getPayment
+      tags: [payments]
+      summary: Статус платежа
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/Payment'}}}}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /webhooks/payment:
+    post:
+      operationId: paymentWebhook
+      tags: [webhooks]
+      summary: Callback платёжного шлюза
+      security: []
+      parameters:
+        - {name: X-Signature, in: header, required: true, schema: {type: string}, description: HMAC-SHA256 тела запроса}
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/GatewayWebhook'}}}}
+      responses:
+        '200': {description: Принято (повтор обрабатывается идемпотентно)}
+        '401': {description: Невалидная подпись, content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}}
+  /tasks:
+    get:
+      operationId: listTasks
+      tags: [tasks]
+      summary: Задачи менеджера
+      parameters:
+        - {$ref: '#/components/parameters/Page'}
+        - {$ref: '#/components/parameters/Size'}
+        - {name: status, in: query, schema: {$ref: '#/components/schemas/TaskStatus'}}
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {type: array, items: {$ref: '#/components/schemas/Task'}}}}}
+  /tasks/{id}:
+    parameters: [ {$ref: '#/components/parameters/Id'} ]
+    patch:
+      operationId: updateTask
+      tags: [tasks]
+      summary: Изменить статус задачи
+      requestBody: {required: true, content: {application/json: {schema: {type: object, required: [status], properties: {status: {$ref: '#/components/schemas/TaskStatus'}, comment: {type: string}}}}}}
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/Task'}}}}
+        '409': {$ref: '#/components/responses/Conflict'}
+  /notifications:
+    get:
+      operationId: listNotifications
+      tags: [notifications]
+      summary: Уведомления текущего пользователя
+      parameters: [ {$ref: '#/components/parameters/Page'}, {$ref: '#/components/parameters/Size'} ]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {type: array, items: {$ref: '#/components/schemas/Notification'}}}}}
+components:
+  securitySchemes:
+    bearerAuth: {type: http, scheme: bearer, bearerFormat: JWT}
+  parameters:
+    Id: {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+    Page: {name: page, in: query, schema: {type: integer, minimum: 0, default: 0}}
+    Size: {name: size, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+    IdempotencyKey: {name: Idempotency-Key, in: header, required: true, schema: {type: string, format: uuid}}
+  responses:
+    BadRequest: {description: Некорректный запрос, content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}}
+    Unauthorized: {description: Не аутентифицирован / неверные учётные данные / refresh-токен недействителен, content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}}
+    Gone: {description: Токен приглашения истёк или уже использован, content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}}
+    TooManyRequests: {description: Превышен лимит попыток входа (12_security), content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}}
+    Forbidden: {description: Нет доступа, content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}}
+    NotFound: {description: Не найдено, content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}}
+    Conflict: {description: Недопустимый статус, content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}}
+    ValidationError: {description: Ошибка валидации, content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}}
+  schemas:
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email: {type: string, format: email}
+        password: {type: string, format: password, minLength: 12, maxLength: 128, writeOnly: true}
+    RefreshRequest:
+      type: object
+      required: [refresh_token]
+      properties:
+        refresh_token: {type: string, writeOnly: true}
+    InvitationAccept:
+      type: object
+      required: [password]
+      properties:
+        password: {type: string, format: password, minLength: 12, maxLength: 128, writeOnly: true, description: Требования к сложности — 12_security «Пароли»}
+    TokenPair:
+      type: object
+      required: [access_token, refresh_token, token_type, expires_in]
+      properties:
+        access_token: {type: string, description: JWT, TTL 15 мин}
+        refresh_token: {type: string, description: Одноразовый, TTL 30 дней, ротируется при каждом /auth/refresh}
+        token_type: {type: string, enum: [Bearer]}
+        expires_in: {type: integer, description: Срок жизни access_token в секундах, example: 900}
+    User:
+      type: object
+      description: Публичное представление user_account. Поле password_hash в контракте отсутствует намеренно (FR-51, TC-AUTH-02).
+      required: [id, organization_id, email, role, is_active]
+      additionalProperties: false
+      properties:
+        id: {type: string, format: uuid}
+        organization_id: {type: string, format: uuid}
+        email: {type: string, format: email}
+        role: {type: string, enum: [ADMIN, MANAGER, TENANT]}
+        tenant_id: {type: string, format: uuid, nullable: true}
+        is_active: {type: boolean}
+        invited_at: {type: string, format: date-time, nullable: true}
+        last_login_at: {type: string, format: date-time, nullable: true}
+        created_at: {type: string, format: date-time}
+    Error:
+      type: object
+      required: [code, message]
+      properties:
+        code: {type: string, example: INVOICE_NOT_PAYABLE}
+        message: {type: string}
+        details: {type: array, items: {type: object, properties: {field: {type: string}, issue: {type: string}}}}
+    Money: {type: string, pattern: '^-?[0-9]+\.[0-9]{2}$', example: '45000.00', description: 'Сумма в рублях, строка с двумя знаками'}
+    ContractStatus: {type: string, enum: [DRAFT, ACTIVE, SUSPENDED, EXPIRED, TERMINATED]}
+    InvoiceStatus: {type: string, enum: [DRAFT, ISSUED, PARTIALLY_PAID, PAID, CANCELLED], description: "Ось оплаты. Просрочка — отдельные поля overdue_since / overdue (ADR-0005)"}
+    PaymentStatus: {type: string, enum: [PENDING, CONFIRMED, FAILED, CANCELLED, EXPIRED, REFUNDED], description: 'Синхронизировано с CHECK payment.status в db/schema.sql и diagrams/state_payment.puml'}
+    TaskStatus: {type: string, enum: [NEW, IN_PROGRESS, DONE, CANCELLED]}
+    BillingPeriod: {type: string, enum: [MONTHLY, QUARTERLY]}
+    PropertyCreate:
+      type: object
+      required: [address, area_sqm]
+      properties:
+        name: {type: string}
+        address: {type: string}
+        area_sqm: {type: number}
+        type: {type: string, enum: [OFFICE, RETAIL, WAREHOUSE, RESIDENTIAL]}
+    Property:
+      allOf:
+        - {$ref: '#/components/schemas/PropertyCreate'}
+        - type: object
+          properties:
+            id: {type: string, format: uuid}
+            organization_id: {type: string, format: uuid}
+            archived: {type: boolean}
+            created_at: {type: string, format: date-time}
+    PropertyPage:
+      type: object
+      properties:
+        items: {type: array, items: {$ref: '#/components/schemas/Property'}}
+        page: {type: integer}
+        size: {type: integer}
+        total: {type: integer}
+    TenantType:
+      type: string
+      enum: [LEGAL_ENTITY, SOLE_PROPRIETOR, INDIVIDUAL]
+      description: Тип арендатора (FR-50). ИНН обязателен для LEGAL_ENTITY и SOLE_PROPRIETOR (db CHECK ck_tenant_inn)
+    TenantCreate:
+      type: object
+      required: [name]
+      properties:
+        name: {type: string}
+        type: {$ref: '#/components/schemas/TenantType', default: LEGAL_ENTITY}
+        inn: {type: string, description: Обязателен, если type != INDIVIDUAL}
+        email: {type: string, format: email}
+        phone: {type: string}
+    Tenant:
+      allOf:
+        - {$ref: '#/components/schemas/TenantCreate'}
+        - type: object
+          properties:
+            id: {type: string, format: uuid}
+            organization_id: {type: string, format: uuid}
+    ContractCreate:
+      type: object
+      required: [property_id, tenant_id, rent_amount, billing_period, start_date, end_date]
+      properties:
+        property_id: {type: string, format: uuid}
+        tenant_id: {type: string, format: uuid}
+        rent_amount: {$ref: '#/components/schemas/Money'}
+        billing_period: {$ref: '#/components/schemas/BillingPeriod'}
+        billing_day: {type: integer, minimum: 1, maximum: 28, default: 1}
+        grace_days: {type: integer, minimum: 0, default: 5}
+        penalty_rate_pct: {type: number, example: 0.1, description: Процент от долга в день}
+        start_date: {type: string, format: date}
+        end_date: {type: string, format: date}
+    Contract:
+      allOf:
+        - {$ref: '#/components/schemas/ContractCreate'}
+        - type: object
+          properties:
+            id: {type: string, format: uuid}
+            status: {$ref: '#/components/schemas/ContractStatus'}
+            next_billing_date: {type: string, format: date, nullable: true}
+            created_at: {type: string, format: date-time}
+    InvoiceAdjust:
+      type: object
+      required: [amount, reason]
+      properties:
+        amount: {$ref: '#/components/schemas/Money'}
+        reason: {type: string}
+    Invoice:
+      type: object
+      properties:
+        id: {type: string, format: uuid}
+        contract_id: {type: string, format: uuid}
+        tenant_id: {type: string, format: uuid}
+        period_start: {type: string, format: date}
+        period_end: {type: string, format: date}
+        issue_date: {type: string, format: date}
+        due_date: {type: string, format: date}
+        amount: {$ref: '#/components/schemas/Money'}
+        penalty_amount: {$ref: '#/components/schemas/Money'}
+        paid_amount: {$ref: '#/components/schemas/Money'}
+        overpaid_amount:
+          type: string
+          format: decimal
+          readOnly: true
+          description: Переплата по счёту; зачитывается в следующий счёт строкой OVERPAYMENT_CREDIT (ADR-0010)
+        balance: {$ref: '#/components/schemas/Money'}
+        status: {$ref: '#/components/schemas/InvoiceStatus'}
+    PaymentInit:
+      type: object
+      required: [amount]
+      properties:
+        amount: {$ref: '#/components/schemas/Money'}
+        return_url: {type: string, format: uri}
+    PaymentInitResult:
+      type: object
+      properties:
+        payment_id: {type: string, format: uuid}
+        status: {$ref: '#/components/schemas/PaymentStatus'}
+        payment_url: {type: string, format: uri, description: Ссылка на страницу оплаты шлюза}
+        expires_at: {type: string, format: date-time}
+    Payment:
+      type: object
+      properties:
+        id: {type: string, format: uuid}
+        invoice_id: {type: string, format: uuid}
+        amount: {$ref: '#/components/schemas/Money'}
+        status: {$ref: '#/components/schemas/PaymentStatus'}
+        provider_payment_id: {type: string}
+        created_at: {type: string, format: date-time}
+        confirmed_at: {type: string, format: date-time, nullable: true}
+    GatewayWebhook:
+      type: object
+      required: [provider_payment_id, status, amount]
+      properties:
+        provider_payment_id: {type: string}
+        payment_id: {type: string, format: uuid}
+        status: {type: string, enum: [succeeded, failed, canceled]}
+        amount: {$ref: '#/components/schemas/Money'}
+        occurred_at: {type: string, format: date-time}
+    Task:
+      type: object
+      properties:
+        id: {type: string, format: uuid}
+        type: {type: string, enum: [OVERDUE_FOLLOWUP, CONTRACT_EXPIRING, MANUAL]}
+        invoice_id: {type: string, format: uuid, nullable: true}
+        assignee_id: {type: string, format: uuid}
+        priority: {type: string, enum: [LOW, NORMAL, HIGH]}
+        status: {$ref: '#/components/schemas/TaskStatus'}
+        due_at: {type: string, format: date-time}
+    Notification:
+      type: object
+      properties:
+        id: {type: string, format: uuid}
+        type: {type: string, enum: [INVOICE_ISSUED, PAYMENT_REMINDER, INVOICE_OVERDUE, PAYMENT_CONFIRMED]}
+        channel: {type: string, enum: [EMAIL, SMS, PUSH]}
+        text: {type: string}
+        created_at: {type: string, format: date-time}
+        read: {type: boolean}

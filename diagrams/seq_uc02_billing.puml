@@ -1,0 +1,28 @@
+@startuml seq_uc02
+title UC-02 Выставление счёта (transactional outbox, ADR-0003)
+participant "Scheduler" as S
+participant "Billing Service" as B
+database "PostgreSQL" as DB
+participant "Outbox Relay" as R
+queue "Kafka rentflow.invoice" as K
+participant "Notification Service" as N
+S -> B : tick (каждые 5 мин)
+B -> DB : SELECT contract WHERE status='ACTIVE' AND next_billing_date <= today(org.tz)\nFOR UPDATE SKIP LOCKED
+loop по каждому договору
+  B -> DB : BEGIN; SET LOCAL app.current_org
+  B -> DB : INSERT invoice (ISSUED) + invoice_line(RENT)\nUNIQUE(contract_id, period_start) защищает от дубля
+  B -> DB : UPDATE contract SET next_billing_date = +period
+  B -> DB : INSERT outbox_event(topic, partition_key=invoice_id, payload InvoiceIssued v2)
+  B -> DB : COMMIT
+end
+R -> DB : SELECT outbox_event WHERE published_at IS NULL ORDER BY created_at
+R -> K : produce(key=partition_key, value=payload)
+R -> DB : UPDATE outbox_event SET published_at=now()
+K -> N : consume InvoiceIssued
+N -> DB : INSERT processed_event(consumer='notification', event_id) ON CONFLICT DO NOTHING
+alt новая запись
+  N -> DB : INSERT notification(...)
+else дубль (at-least-once)
+  N -> N : пропустить
+end
+@enduml

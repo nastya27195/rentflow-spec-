@@ -1,0 +1,20 @@
+@startuml state_invoice
+' Ось оплаты (status). Ось срока — поле overdue_since (ADR-0005), состояния OVERDUE нет.
+[*] --> DRAFT : ручной счёт (менеджер)
+[*] --> ISSUED : billing-job (UC-02)
+DRAFT --> ISSUED : выставить
+DRAFT --> CANCELLED : удалить черновик
+ISSUED --> PARTIALLY_PAID : PaymentConfirmed, paid < amount+penalty
+ISSUED --> PAID : PaymentConfirmed, paid >= amount+penalty
+PARTIALLY_PAID --> PAID : PaymentConfirmed, paid >= amount+penalty
+PAID --> PARTIALLY_PAID : PaymentRefunded, paid > 0
+PAID --> ISSUED : PaymentRefunded, paid = 0
+ISSUED --> CANCELLED : сторно менеджером, paid = 0
+PAID --> [*]
+CANCELLED --> [*]
+note right of ISSUED
+  overdue-job: если due_date < today(org.tz) и overdue_since IS NULL
+  -> overdue_since = today, событие InvoiceOverdue, задача OVERDUE_FOLLOWUP
+  Просрочен <=> overdue_since IS NOT NULL AND status IN (ISSUED, PARTIALLY_PAID)
+end note
+@enduml

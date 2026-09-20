@@ -1,0 +1,26 @@
+@startuml seq_uc03
+title UC-03 Оплата счёта (идемпотентность, webhook, outbox)
+actor "Арендатор" as T
+participant "API" as A
+database "PostgreSQL" as DB
+participant "Провайдер" as P
+participant "Outbox Relay" as R
+queue "Kafka rentflow.payment" as K
+T -> A : POST /payments (Idempotency-Key, invoice_id, amount)
+A -> DB : INSERT idempotency_key(user_id, key, hash, IN_PROGRESS)
+alt конфликт ключа
+  A --> T : 409 request_in_progress | 422 idempotency_key_reused | сохранённый ответ
+end
+A -> DB : INSERT payment(PENDING) (amount <= остаток, иначе 422)
+A -> P : create payment
+P --> A : provider_payment_id, redirect_url
+A -> DB : UPDATE payment SET provider_payment_id; UPDATE idempotency_key SET COMPLETED, response
+A --> T : 201 {payment, redirect_url}
+P -> A : webhook succeeded (X-Signature HMAC raw body, X-Timestamp)
+A -> A : проверить подпись и окно 5 мин (иначе 401)
+A -> DB : BEGIN; UPDATE payment SET CONFIRMED WHERE (provider, provider_payment_id) AND status=PENDING
+note right : триггер fn_invoice_recalc: paid_amount, status ISSUED->PARTIALLY_PAID/PAID
+A -> DB : INSERT outbox_event(PaymentConfirmed, key=invoice_id); COMMIT
+A --> P : 200 (повтор webhook -> 0 строк -> тоже 200)
+R -> K : produce PaymentConfirmed
+@enduml

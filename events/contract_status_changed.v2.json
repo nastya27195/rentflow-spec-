@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ContractStatusChanged v2",
+  "type": "object",
+  "required": ["event_id","event_type","schema_version","occurred_at","organization_id","partition_key","payload"],
+  "properties": {
+    "event_id": {"type":"string","format":"uuid"},
+    "event_type": {"const":"ContractStatusChanged"},
+    "schema_version": {"const":2},
+    "occurred_at": {"type":"string","format":"date-time"},
+    "organization_id": {"type":"string","format":"uuid"},
+    "topic": {"const":"rentflow.contract"},
+    "partition_key": {"type":"string","description":"contract_id"},
+    "payload": {"type":"object","required":["contract_id","old_status","new_status"],"properties":{"contract_id":{"type":"string","format":"uuid"},"old_status":{"type":"string"},"new_status":{"enum":["DRAFT","ACTIVE","SUSPENDED","EXPIRED","TERMINATED"]},"reason":{"type":"string"}}}
+  }
+}

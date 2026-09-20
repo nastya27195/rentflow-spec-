@@ -1,0 +1,11 @@
+@startuml
+!include _style.puml
+title RentFlow — Жизненный цикл задачи менеджера (Task)
+[*] --> OPEN : InvoiceOverdue /\nнесопоставленный оффлайн-платёж /\nошибка billing run\n[не более одной открытой задачи типа на счёт]
+OPEN --> IN_PROGRESS : менеджер взял в работу
+IN_PROGRESS --> DONE : менеджер закрыл задачу\n[комментарий обязателен]
+OPEN --> CANCELLED : счёт оплачен / отменён\n[автоматически по InvoicePaid]
+IN_PROGRESS --> CANCELLED : счёт оплачен / отменён\n[автоматически по InvoicePaid]
+DONE --> [*]
+CANCELLED --> [*]
+@enduml
